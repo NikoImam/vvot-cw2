@@ -182,7 +182,7 @@ data "archive_file" "handler_function_zip" {
   type        = "zip"
   output_path = "handler_function.zip"
   source_dir  = "../handler_function"
-  excludes = [ ".env" ]
+  excludes    = [".env"]
 }
 
 resource "yandex_function" "handler_function" {
@@ -195,7 +195,13 @@ resource "yandex_function" "handler_function" {
   user_hash          = data.archive_file.handler_function_zip.output_sha256
   folder_id          = var.folder_id
 
-  depends_on = [ data.archive_file.handler_function_zip ]
+  depends_on = [
+    data.archive_file.handler_function_zip,
+    yandex_lockbox_secret.secret,
+    yandex_lockbox_secret_version.secret_version,
+    yandex_resourcemanager_folder_iam_member.kms_keys_encrypterDecrypter,
+    yandex_resourcemanager_folder_iam_member.lockbox_payloadViewer
+  ]
 
   content {
     zip_filename = data.archive_file.handler_function_zip.output_path
@@ -227,7 +233,7 @@ data "archive_file" "scan_function_zip" {
   type        = "zip"
   output_path = "scan_function.zip"
   source_dir  = "../scan_function"
-  excludes = [ ".env" ]
+  excludes    = [".env"]
 }
 
 resource "yandex_function" "scan_function" {
@@ -240,7 +246,7 @@ resource "yandex_function" "scan_function" {
   user_hash          = data.archive_file.scan_function_zip.output_sha256
   folder_id          = var.folder_id
 
-  depends_on = [ data.archive_file.scan_function_zip ]
+  depends_on = [data.archive_file.scan_function_zip]
 
   content {
     zip_filename = data.archive_file.scan_function_zip.output_path
