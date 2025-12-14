@@ -22,3 +22,6 @@ terraform apply
 ```shell
 terraform destroy
 ```
+
+Ошибка интеграции YDB в API-Gateway:
+` {"message":"Unsupported API version \"\" for table \"/ru-central1/b1g71e95h51okii30p25/etnssrt38mqn0jvpl6dk/docs\""}  `

@@ -68,15 +68,9 @@ resource "yandex_resourcemanager_folder_iam_member" "functions_functionInvoker" 
   member    = "serviceAccount:${yandex_iam_service_account.sa.id}"
 }
 
-resource "yandex_resourcemanager_folder_iam_member" "ymq_reader" {
+resource "yandex_resourcemanager_folder_iam_member" "ymq_admin" {
   folder_id = var.folder_id
-  role      = "ymq.reader"
-  member    = "serviceAccount:${yandex_iam_service_account.sa.id}"
-}
-
-resource "yandex_resourcemanager_folder_iam_member" "ymq_writer" {
-  folder_id = var.folder_id
-  role      = "ymq.writer"
+  role      = "ymq.admin"
   member    = "serviceAccount:${yandex_iam_service_account.sa.id}"
 }
 
@@ -167,8 +161,7 @@ resource "yandex_message_queue" "download_queue" {
   secret_key = yandex_iam_service_account_static_access_key.sa_static_key.secret_key
 
   depends_on = [
-    yandex_resourcemanager_folder_iam_member.ymq_reader,
-    yandex_resourcemanager_folder_iam_member.ymq_writer,
+    yandex_resourcemanager_folder_iam_member.ymq_admin,
     yandex_iam_service_account_static_access_key.sa_static_key
   ]
 }
@@ -182,19 +175,14 @@ data "yandex_message_queue" "download_queue_data" {
 }
 
 # ============================
-# Создание функции-обработчика
+#       Создание функций
 # ============================
 
 data "archive_file" "handler_function_zip" {
   type        = "zip"
   output_path = "handler_function.zip"
   source_dir  = "../handler_function"
-}
-
-resource "yandex_storage_object" "handler_function_zip_object" {
-  bucket = yandex_storage_bucket.bucket.bucket
-  key    = "handler_function.zip"
-  source = data.archive_file.handler_function_zip.output_path
+  excludes = [ ".env" ]
 }
 
 resource "yandex_function" "handler_function" {
@@ -207,14 +195,10 @@ resource "yandex_function" "handler_function" {
   user_hash          = data.archive_file.handler_function_zip.output_sha256
   folder_id          = var.folder_id
 
-  depends_on = [
-    data.archive_file.handler_function_zip,
-    yandex_storage_object.handler_function_zip_object
-  ]
+  depends_on = [ data.archive_file.handler_function_zip ]
 
-  package {
-    bucket_name = yandex_storage_bucket.bucket.bucket
-    object_name = yandex_storage_object.handler_function_zip_object.key
+  content {
+    zip_filename = data.archive_file.handler_function_zip.output_path
   }
 
   environment = {
@@ -236,6 +220,35 @@ resource "yandex_function" "handler_function" {
     version_id           = yandex_lockbox_secret_version.secret_version.id
     key                  = "AWS_SECRET_ACCESS_KEY"
     environment_variable = "AWS_SECRET_ACCESS_KEY"
+  }
+}
+
+data "archive_file" "scan_function_zip" {
+  type        = "zip"
+  output_path = "scan_function.zip"
+  source_dir  = "../scan_function"
+  excludes = [ ".env" ]
+}
+
+resource "yandex_function" "scan_function" {
+  name               = "vvot05-cw2-scan-function"
+  runtime            = "python312"
+  entrypoint         = "index.handler"
+  memory             = 512
+  execution_timeout  = 60 * 1
+  service_account_id = yandex_iam_service_account.sa.id
+  user_hash          = data.archive_file.scan_function_zip.output_sha256
+  folder_id          = var.folder_id
+
+  depends_on = [ data.archive_file.scan_function_zip ]
+
+  content {
+    zip_filename = data.archive_file.scan_function_zip.output_path
+  }
+
+  environment = {
+    YDB_ENDPOINT = "grpcs://${yandex_ydb_database_serverless.db.ydb_api_endpoint}"
+    YDB_DATABASE = yandex_ydb_database_serverless.db.database_path
   }
 }
 
@@ -297,23 +310,12 @@ paths:
   /documents:
     get:
       x-yc-apigateway-integration:
-        type: cloud_ydb
-        action: Scan
-        database: ${yandex_ydb_database_serverless.db.database_path}
+        payload_format_version: '0.1'
+        function_id: ${yandex_function.scan_function.id}
+        tag: $latest
+        type: cloud_functions
         service_account_id: ${yandex_iam_service_account.sa.id}
-        table_name: ${yandex_ydb_table.docs-table.path}
-      operationId: getDocs
       
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                items:
-                  $ref: '#/components/schemas/Document'
-                type: array
-          description: Documents
-
   /document/{key}:
     get:
       parameters:
@@ -332,22 +334,5 @@ paths:
       responses:
         '200':
           description: File download
-
-components:
-  schemas:
-    Document:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        url:
-          type: string
-      required:
-        - id
-        - name
-        - url
 EOT
 }
