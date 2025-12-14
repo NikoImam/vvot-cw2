@@ -23,5 +23,31 @@ terraform apply
 terraform destroy
 ```
 
-Ошибка интеграции YDB в API-Gateway:
+### Проверка API
+```shell
+export API_GW_URL=<api_gw_url>
+```
+
+```shell
+curl -X POST https://$API_GW_URL/upload \
+-H "Content-Type: application/json" \
+-d '{"name": "example.pdf", "url": "https://raw.githubusercontent.com/NikoImam/vvot-cw2/main/files/example_1.pdf"}' -i
+```
+
+```shell
+curl -X POST https://$API_GW_URL/upload \
+-H "Content-Type: application/json" \
+-d '{"name": "example.doc", "url": "https://raw.githubusercontent.com/NikoImam/vvot-cw2/main/files/example_2.doc"}' -i
+```
+
+```shell
+curl https://$API_GW_URL/documents | jq
+```
+
+```shell
+curl https://$API_GW_URL/document/<id> -OJ
+```
+
+---
+**Ошибка интеграции YDB в API-Gateway**:
 ` {"message":"Unsupported API version \"\" for table \"/ru-central1/b1g71e95h51okii30p25/etnssrt38mqn0jvpl6dk/docs\""}  `

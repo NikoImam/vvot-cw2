@@ -143,7 +143,7 @@ resource "yandex_ydb_table" "docs-table" {
 
 resource "yandex_storage_bucket" "bucket" {
   bucket        = "vvot05-cw2-bucket"
-  max_size      = 10e9
+  max_size      = 1e9
   folder_id     = var.folder_id
   force_destroy = true
 }
@@ -335,4 +335,8 @@ paths:
         '200':
           description: File download
 EOT
+}
+
+output "api_gw_url" {
+  value = yandex_api_gateway.api_gw.domain
 }

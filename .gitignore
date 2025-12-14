@@ -245,3 +245,6 @@ pip-selfcheck.json
 .bashrc
 *.zip
 .terraform.lock.hcl
+*.pdf
+*.doc
+*.docx

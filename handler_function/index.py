@@ -4,6 +4,7 @@ import os
 import requests
 import uuid
 import json
+import io
 
 YDB_ENDPOINT = os.getenv('YDB_ENDPOINT')
 YDB_DATABASE = os.getenv('YDB_DATABASE')
@@ -25,18 +26,20 @@ def upload_to_bucket(name: str, url: str) -> uuid.UUID:
 
     obj_key = f'docs/{id}'
 
-    with requests.get(url=url, stream=True, timeout=20) as response:
-        response.raise_for_status()
+    response = requests.get(url=url, stream=True, timeout=60)
+    response.raise_for_status()
 
-        s3_client.upload_fileobj(
-            response.raw,
-            BUCKET_NAME,
-            obj_key,
-            ExtraArgs={
-                'ContentType': response.headers.get('Content-Type'),
-                'ContentDisposition': f'attachment; filename="{name}"'
-            }
-        )
+    buff = io.BytesIO(response.content)
+
+    s3_client.upload_fileobj(
+        buff,
+        BUCKET_NAME,
+        obj_key,
+        ExtraArgs={
+            'ContentType': response.headers.get('Content-Type', 'application/octet-stream'),
+            'ContentDisposition': f'attachment; filename="{name}"'
+        }
+    )
         
     return id
     
